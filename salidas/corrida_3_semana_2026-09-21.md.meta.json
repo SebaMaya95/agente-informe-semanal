@@ -1,0 +1,101 @@
+{
+  "fecha_hora": "2026-09-24T23:36:02",
+  "semana_lunes": "2026-09-21",
+  "contrato": "v3",
+  "system_prompt_sha256_16": "139ddb4e93ef8a71",
+  "user_prompt_sha256_16": "caf814304c959f84",
+  "modelo_solicitado": "sonnet",
+  "modelo_resuelto": "claude-sonnet-5",
+  "herramientas": [
+    "Read",
+    "Glob",
+    "Grep",
+    "Write"
+  ],
+  "entorno_aislado": true,
+  "banderas_del_cli": [
+    "--model",
+    "sonnet",
+    "--tools",
+    "Read,Glob,Grep,Write",
+    "--permission-mode",
+    "acceptEdits",
+    "--permission-prompts",
+    "none",
+    "--output-format",
+    "stream-json",
+    "--verbose",
+    "--no-session-persistence",
+    "--restricted"
+  ],
+  "archivo_salida": "salidas/corrida_3_semana_2026-09-21.md",
+  "salida_escrita_por_el_agente": true,
+  "archivos_leidos_distintos": [
+    "insumos/semana_2026-09-21/jue_cierre.txt",
+    "insumos/semana_2026-09-21/jue_daily.txt",
+    "insumos/semana_2026-09-21/lun_cierre.txt",
+    "insumos/semana_2026-09-21/lun_daily.txt",
+    "insumos/semana_2026-09-21/mar_cierre.txt",
+    "insumos/semana_2026-09-21/mar_daily.txt",
+    "insumos/semana_2026-09-21/mie_cierre.txt",
+    "insumos/semana_2026-09-21/mie_daily.txt"
+  ],
+  "fuera_de_la_semana": [],
+  "insumos_esperados_no_leidos": [
+    "insumos/semana_2026-09-21/vie_cierre.txt",
+    "insumos/semana_2026-09-21/vie_daily.txt"
+  ],
+  "cobertura_de_lectura": {
+    "insumos/semana_2026-09-21/lun_daily.txt": {
+      "lineas": 536,
+      "lineas_leidas": 536,
+      "estado": "completo"
+    },
+    "insumos/semana_2026-09-21/lun_cierre.txt": {
+      "lineas": 1738,
+      "lineas_leidas": 1738,
+      "estado": "completo"
+    },
+    "insumos/semana_2026-09-21/mar_daily.txt": {
+      "lineas": 625,
+      "lineas_leidas": 625,
+      "estado": "completo"
+    },
+    "insumos/semana_2026-09-21/mar_cierre.txt": {
+      "lineas": 1745,
+      "lineas_leidas": 1745,
+      "estado": "completo"
+    },
+    "insumos/semana_2026-09-21/mie_daily.txt": {
+      "lineas": 376,
+      "lineas_leidas": 376,
+      "estado": "completo"
+    },
+    "insumos/semana_2026-09-21/mie_cierre.txt": {
+      "lineas": 1743,
+      "lineas_leidas": 1743,
+      "estado": "completo"
+    },
+    "insumos/semana_2026-09-21/jue_daily.txt": {
+      "lineas": 923,
+      "lineas_leidas": 923,
+      "estado": "completo"
+    },
+    "insumos/semana_2026-09-21/jue_cierre.txt": {
+      "lineas": 1737,
+      "lineas_leidas": 1737,
+      "estado": "completo"
+    }
+  },
+  "llamadas_a_read": 17,
+  "turnos": 23,
+  "duracion_s": 301,
+  "tokens": {
+    "input_tokens": 24,
+    "output_tokens": 35368,
+    "cache_read_input_tokens": 1756083,
+    "cache_creation_input_tokens": 284729
+  },
+  "respuesta_final_del_agente": "salidas/corrida_3_semana_2026-09-21.md, 8/10",
+  "codigo_de_salida_cli": 0
+}
