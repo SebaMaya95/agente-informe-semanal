@@ -1,6 +1,6 @@
 # Agente de informe semanal: mercado y sector agro
 
-> **Estado:** en construcción. Hito 3 de 7: corrida 1 hecha con el contrato v1; falta decidir la iteración 1. Las secciones marcadas como _pendiente_ se completan en el hito que corresponde, justo después de cada corrida y no al final, para que el registro no dependa de la memoria.
+> **Estado:** en construcción. Hito 4 de 7: iteración 1 escrita (contrato v2), todavía sin correr. Las secciones marcadas como _pendiente_ se completan en el hito que corresponde, justo después de cada corrida y no al final, para que el registro no dependa de la memoria.
 
 ## 1. La tarea
 
@@ -29,21 +29,22 @@ Cada versión del contrato queda congelada en [`iteraciones/`](iteraciones/) (`v
 - **Los textos de los mails no se usan.** Los PDF son autocontenidos.
 - **Semanas usadas.** Corrida 1: 7 al 11 de septiembre de 2026. Corrida 2: 14 al 18. Corrida 3: 21 al 25 (el viernes 25 todavía no había llegado cuando se armó el contrato, por eso la corrida 3 se hace después).
 - **Lo que se sabía de los datos al escribir v1.** Durante la exploración de los insumos se detectaron irregularidades, por ejemplo que el cierre del lunes 14 llegó en inglés, con menos páginas y con la portada fechada el 15. v1 no incluye reglas para esos casos a propósito: se agregan solo si una corrida muestra que fallan.
-- **Validador de formato.** [`scripts/validar_salida.py`](scripts/validar_salida.py) chequea estructura (títulos, columnas, filas, valores permitidos, fuentes, extensión, anonimato) y se escribió a partir de la especificación, antes de ver ninguna salida. No juzga la calidad del análisis. El chequeo de anonimato lee sus términos de un archivo local que no se publica (`insumos/terminos_prohibidos.txt`); sin ese archivo, el chequeo se omite y el validador lo avisa.
+- **Validador de formato.** [`scripts/validar_salida.py`](scripts/validar_salida.py) chequea estructura (títulos, columnas, filas, valores permitidos, fuentes, extensión, anonimato) y se escribió a partir de la especificación, antes de ver ninguna salida. Tiene una especificación por versión del contrato (`--spec v1` o `--spec v2`); la de v2 se escribió antes de correr v2. No juzga la calidad del análisis. El chequeo de anonimato lee sus términos de un archivo local que no se publica (`insumos/terminos_prohibidos.txt`); sin ese archivo, el chequeo se omite y el validador lo avisa.
 
 ## 3. Cómo se corre
 
 1. **Paso 0, manual y fuera del contrato:** los informes llegan por mail con el PDF adjunto; se descargan y se ubican en `insumos/semana_<fecha del lunes>/` con los nombres `lun|mar|mie|jue|vie` + `_daily.pdf` o `_cierre.pdf`. Esa carpeta no se publica.
 2. **Texto plano:** `python scripts/extraer_texto.py` convierte cada PDF en `.txt` (requiere `pypdf`).
 3. **Agente:** `python scripts/preparar_agente.py` arma el agente con el contenido exacto de `system_prompt.md`.
-4. **Invocación:** `python scripts/correr_agente.py --lunes 2026-09-07 --version v1 --archivo corrida_1_semana_2026-09-07.md`. El script usa el CLI de Claude Code en modo no interactivo (requiere `claude auth login`) y:
+4. **Invocación:** `python scripts/correr_agente.py --lunes 2026-09-14 --version v2 --archivo corrida_2_semana_2026-09-14.md`. El script usa el CLI de Claude Code en modo no interactivo (requiere `claude auth login`) y:
    - pasa el contenido de `system_prompt.md` como `--system-prompt`, es decir, como system prompt real y no pegado en el mensaje;
    - pasa `user_prompt.md`, con la semana, la versión y el archivo de destino completados, como mensaje del usuario;
    - usa el modelo `sonnet` (en la corrida 1 se resolvió como `claude-sonnet-5`) y le da solo cuatro herramientas: Read, Glob, Grep y Write, sin shell ni web;
-   - deja que el agente escriba el informe en `salidas/` y guarda `salidas/<archivo>.meta.json` con el hash del contrato usado, el modelo, los turnos, los tokens y los archivos que el agente abrió de verdad.
+   - desde la corrida 2 lo corre **aislado**: en una carpeta temporal que contiene solo los `.txt` de la semana y una carpeta `salidas/` vacía, con las herramientas de archivos confinadas a esa carpeta (`--restricted`). Así el agente no puede leer el README, los scripts, otras semanas ni los contratos anteriores. La corrida 1 no estaba aislada y el agente leyó el README (falla F2). Es un cambio de entorno, no de contrato;
+   - deja que el agente escriba el informe, lo copia sin tocarlo a `salidas/` y guarda `<archivo>.meta.json` con el hash del contrato usado, el modelo, los turnos, los tokens, los archivos que el agente abrió de verdad y si abrió alguno fuera de la semana.
 
    Está hecho en Python y no en PowerShell porque PowerShell 5.1 rompe las comillas dobles de un texto largo al pasarlo como argumento. Antes de la primera corrida se comprobó que el system prompt llega íntegro: el agente respondió bien siete preguntas puntuales sobre su contenido, incluida la última sección.
-5. **Chequeo de formato:** `python scripts/validar_salida.py salidas/<archivo>.md`.
+5. **Chequeo de formato:** `python scripts/validar_salida.py --spec v2 salidas/<archivo>.md`.
 
 ## 4. Corridas
 
@@ -78,17 +79,39 @@ Además, después de cada cambio de contrato se vuelve a correr la semana anteri
 - **F4. Una fecha que no está en los informes.** La expectativa 5 dice "Reunión del 16/9". Ningún daily de la semana menciona esa fecha: el del lunes dice "la semana que viene" y el del viernes "la reunión de septiembre". Es conocimiento externo, que la restricción prohíbe.
 - **F5. Una etiqueta de fuente de más.** La expectativa 2 cita `[jue-daily] [lun-daily]`, pero el texto sobre "FX estable" y commodities está solo en el del jueves.
 
-**Lectura:** el validador aprobó 21 de 21 y aun así hay cinco fallas de fondo. Un chequeo de estructura no reemplaza leer el contenido contra las fuentes. Ninguna de las cinco es un error de cifras: son fallas de contrato (formato ambiguo, restricciones que no se cumplen) y de entorno.
+- **F6. Redacción con jerga, para lectores que no son especialistas.** El informe usa términos del mercado de capitales sin explicarlos. Un conteo mecánico da 18 términos distintos y 52 apariciones: `pbs` (6), `TEA` (5), `TNA` (4), `Treasury` (4), `intradía` (4), `BCRA` (3), `caución` (3), `A3500` (3) y seis montos escritos con "M", entre otros. Ejemplos textuales: "Caución cerca de 20% TNA", "TEA de la S13N6 de 27,56% a 28,08%", "la de 2027 pasó de TIR 4,6% a 4,2%". v1 solo pedía "tono neutro y profesional" y en el rol no decía que quien lee no es especialista. Sebastián aclaró después de ver la corrida 1 que los lectores no están familiarizados con conceptos técnicos. La lista de términos del conteo se armó después de ver esta corrida, a partir de la jerga observada y de la regla de estilo de v2; es una señal mecánica, no una prueba de claridad.
 
-**Decisión pendiente:** qué pieza del contrato tocar en la iteración 1.
+**Lectura:** el validador aprobó 21 de 21 y aun así hay seis fallas de fondo. Un chequeo de estructura no reemplaza leer el contenido contra las fuentes. Ninguna es una cifra mal copiada: son fallas de contrato (formato ambiguo, redacción sin destinatario claro, restricciones que no se cumplen) y de entorno.
+
+**Decisión (tomada con Sebastián el 24/9):** la iteración 1 toca solo la pieza **Formato** y ataca F1 y F6, que son fallas de la forma de la salida: cómo se arma la tabla y cómo se escribe. F2 se corrige con un cambio de entorno y no de contrato (sección 3). F3, F4 y F5 son fallas de Restricciones y quedan para la iteración 2, que se confirma con lo que muestre la corrida 2. Una salvedad: la clase ubica el tono dentro de Restricciones; acá la redacción se incluyó en Formato porque define la forma de lo que se entrega y el pedido llegó junto con el cambio de la tabla. Es una decisión discutible y queda registrada.
 
 ## 5. Iteración 1
 
-- **Qué falló (textual):** _pendiente_
-- **Pieza del contrato que toqué:** _pendiente_
-- **Cambio (antes → después):** _pendiente_
-- **Qué cambió en la salida:** _pendiente_
-- **Commit:** _pendiente_
+- **Qué falló (textual):** F1 y F6 de la corrida 1. Las dos citas más claras: `| Petróleo (Brent) | 97,3 (intradía) | 104,7 (intradía) | +7,6% |` (columnas de "Cierre" con cotizaciones de la mañana) y "Caución cerca de 20% TNA; TEA de la S13N6 de 27,56% a 28,08%" (jerga sin explicar). Medición del antes: 18 términos técnicos distintos y 52 apariciones.
+- **Pieza del contrato que toqué:** Formato (sección 5 de `system_prompt.md`). Además, como el formato cambió, se actualizaron dos ejemplos de la sección 6 que mostraban el formato viejo (la fila de la tabla 4.1 y el bullet del resumen con "pbs"). Es una consecuencia directa, no una mejora de los ejemplos. El user prompt no cambió.
+- **Cambio (antes → después):** las versiones completas están congeladas en [`iteraciones/v1/`](iteraciones/v1/system_prompt.md) y [`iteraciones/v2/`](iteraciones/v2/system_prompt.md).
+
+  Antes (v1), tabla 4.1:
+  ```
+  ### 4.1 Variables macro
+  | Variable | Cierre lunes | Cierre viernes | Cambio | Lectura para el agro | Fuente |
+  (diez filas fijas: Dólar mayorista (A3500); Dólar CCL; Brecha CCL; Dólar MEP; Tasas en pesos; Riesgo país;
+   Treasury 10 años; Petróleo (Brent); Compras del BCRA y liquidación del agro; Acción Cresud (CRES))
+  ```
+  Después (v2):
+  ```
+  ### 4.1 Variables económicas
+  | Variable | Inicio de semana | Fin de semana | Cambio | Tipo de dato | Lectura para el agro | Fuente |
+  (diez filas fijas: Dólar oficial (mayorista); Dólar financiero (CCL); Brecha entre dólar financiero y oficial;
+   Dólar bolsa (MEP); Tasas de interés en pesos; Riesgo país; Tasa de EE.UU. a 10 años; Petróleo (Brent);
+   Compras del Banco Central y dólares del agro; Acción de Cresud)
+  ```
+  Se agregaron dos bloques nuevos dentro de Formato:
+  - **Cómo se completa la tabla 4.1:** "Inicio/Fin de semana" es el valor del cierre si la variable está en las tablas de cierre y, si solo está en los dailys, el último valor que cita el daily con su fecha. "Tipo de dato" solo puede ser `Cierre`, `Daily`, `Mixto` o `n/d`. "Cambio" se calcula solo cuando el tipo es `Cierre`; en cualquier otro caso, `n/d`.
+  - **Cómo se escribe:** el lector trabaja en el agro y no es especialista en finanzas; frases cortas y una idea por frase; reemplazar la jerga por palabras comunes con ejemplos (Banco Central y no BCRA, puntos y no pbs, tasa de interés anual y no TEA o TNA, renovación de deuda y no rollover, durante el día y no intradía); explicar entre paréntesis lo que no se pueda reemplazar; montos con unidad y sin "M".
+- **Qué espero ver, y qué podría salir mal:** en el validador (spec v2), F1 y F6 en cero. El riesgo principal es que las variables que solo salen de los dailys queden sin cambio numérico (`n/d`), lo que es más honesto pero menos informativo, y que explicar los términos alargue el texto hasta el límite de 1.200 palabras.
+- **Qué cambió en la salida:** _pendiente: se completa con la re-corrida de la semana 2026-09-07 con v2, para comparar con la corrida 1 sobre los mismos datos, y con la corrida 2._
+- **Commit:** "Hito 4: iteración 1, contrato v2 (Formato)". El hash se agrega en el commit siguiente.
 
 ## 6. Iteración 2
 
