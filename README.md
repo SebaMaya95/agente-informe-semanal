@@ -1,6 +1,6 @@
 # Agente de informe semanal: mercado y sector agro
 
-> **Estado:** en construcción. Hito 5 de 7: corrida 2 hecha con v2 y evidencia de la iteración 1; falta decidir la iteración 2. Las secciones marcadas como _pendiente_ se completan en el hito que corresponde, justo después de cada corrida y no al final, para que el registro no dependa de la memoria.
+> **Estado:** en construcción. Hito 6 de 7: iteración 2 escrita (contrato v3), todavía sin correr; la corrida 3 espera los informes del viernes 25/9. Las secciones marcadas como _pendiente_ se completan en el hito que corresponde, justo después de cada corrida y no al final, para que el registro no dependa de la memoria.
 
 ## 1. La tarea
 
@@ -29,7 +29,7 @@ Cada versión del contrato queda congelada en [`iteraciones/`](iteraciones/) (`v
 - **Los textos de los mails no se usan.** Los PDF son autocontenidos.
 - **Semanas usadas.** Corrida 1: 7 al 11 de septiembre de 2026. Corrida 2: 14 al 18. Corrida 3: 21 al 25 (el viernes 25 todavía no había llegado cuando se armó el contrato, por eso la corrida 3 se hace después).
 - **Lo que se sabía de los datos al escribir v1.** Durante la exploración de los insumos se detectaron irregularidades, por ejemplo que el cierre del lunes 14 llegó en inglés, con menos páginas y con la portada fechada el 15. v1 no incluye reglas para esos casos a propósito: se agregan solo si una corrida muestra que fallan.
-- **Validador de formato.** [`scripts/validar_salida.py`](scripts/validar_salida.py) chequea estructura (títulos, columnas, filas, valores permitidos, fuentes, extensión, anonimato) y se escribió a partir de la especificación, antes de ver ninguna salida. Tiene una especificación por versión del contrato (`--spec v1` o `--spec v2`); la de v2 se escribió antes de correr v2. No juzga la calidad del análisis. El chequeo de anonimato lee sus términos de un archivo local que no se publica (`insumos/terminos_prohibidos.txt`); sin ese archivo, el chequeo se omite y el validador lo avisa.
+- **Validador de formato.** [`scripts/validar_salida.py`](scripts/validar_salida.py) chequea estructura (títulos, columnas, filas, valores permitidos, fuentes, extensión, anonimato) y se escribió a partir de la especificación, antes de ver ninguna salida. Tiene una especificación por versión del contrato (`--spec v1`, `v2` o `v3`); cada una se escribió antes de correr la versión correspondiente. No juzga la calidad del análisis. El chequeo de anonimato lee sus términos de un archivo local que no se publica (`insumos/terminos_prohibidos.txt`); sin ese archivo, el chequeo se omite y el validador lo avisa.
 
 ## 3. Cómo se corre
 
@@ -41,10 +41,10 @@ Cada versión del contrato queda congelada en [`iteraciones/`](iteraciones/) (`v
    - pasa `user_prompt.md`, con la semana, la versión y el archivo de destino completados, como mensaje del usuario;
    - usa el modelo `sonnet` (en la corrida 1 se resolvió como `claude-sonnet-5`) y le da solo cuatro herramientas: Read, Glob, Grep y Write, sin shell ni web;
    - desde la corrida 2 lo corre **aislado**: en una carpeta temporal que contiene solo los `.txt` de la semana y una carpeta `salidas/` vacía, con las herramientas de archivos confinadas a esa carpeta (`--restricted`). Así el agente no puede leer el README, los scripts, otras semanas ni los contratos anteriores. La corrida 1 no estaba aislada y el agente leyó el README (falla F2). Es un cambio de entorno, no de contrato;
-   - deja que el agente escriba el informe, lo copia sin tocarlo a `salidas/` y guarda `<archivo>.meta.json` con el hash del contrato usado, el modelo, los turnos, los tokens, los archivos que el agente abrió de verdad y si abrió alguno fuera de la semana.
+   - deja que el agente escriba el informe, lo copia sin tocarlo a `salidas/` y guarda `<archivo>.meta.json` con el hash del contrato usado, el modelo, los turnos, los tokens, los archivos que el agente abrió de verdad, cuánto leyó de cada uno (cobertura de lectura, desde el hito 6) y si abrió alguno fuera de la semana.
 
    Está hecho en Python y no en PowerShell porque PowerShell 5.1 rompe las comillas dobles de un texto largo al pasarlo como argumento. Antes de la primera corrida se comprobó que el system prompt llega íntegro: el agente respondió bien siete preguntas puntuales sobre su contenido, incluida la última sección.
-5. **Chequeo de formato:** `python scripts/validar_salida.py --spec v2 salidas/<archivo>.md`.
+5. **Chequeo de formato:** `python scripts/validar_salida.py --spec v3 salidas/<archivo>.md`.
 6. **Revisión de contenido:** el validador no juzga si lo que dice el informe es cierto. Para eso se contrastan las afirmaciones contra los textos de origen y se usa como ayuda `python scripts/chequear_cifras.py salidas/<archivo>.md <fecha del lunes>`, que lista las cifras específicas (tres o más dígitos) que no aparecen en los insumos. Las cifras cortas (0,5; 3,5) aparecen por casualidad en cualquier texto, por eso no se chequean, y las calculadas por el agente hay que recalcularlas a mano.
 
 ## 4. Corridas
@@ -137,7 +137,7 @@ Además, después de cada cambio de contrato se vuelve a correr la semana anteri
   | Filas de la tabla 4.1 con datos de daily y "Cambio" numérico | 1 | 2 | **0** |
   | Columna "Tipo de dato" | no existe | no existe | en las 10 filas |
   | Palabras (límite 1.200) | 1.010 | 928 | 1.110 |
-  | Cierres que el agente nunca abrió | 1 | 0 | 3 |
+  | Archivos leídos completos (de 10), medido con la cobertura de lectura | 7 | 7 | 7 |
 
   Antes y después de F1, misma variable y mismos datos:
   - Control (v1): `| Petróleo (Brent) | US$97,3 (apertura del lunes) | US$104,7 (dato del viernes, no cierre) | +7,6% aprox. |`. El agente ya avisaba de que no eran cierres, pero igual calculaba el cambio.
@@ -147,14 +147,30 @@ Además, después de cada cambio de contrato se vuelve a correr la semana anteri
   - Control (v1): "Las tasas en pesos siguieron cerca de 20% TNA y el Tesoro salió a renovar $8,1 billones con instrumentos cortos" y "El riesgo país figuraba en 490 pbs el lunes".
   - Re-corrida (v2): "Las tasas en pesos siguieron cerca de 20% anual y el Tesoro ofreció solo instrumentos cortos en su licitación del viernes" y "El riesgo país (costo de financiar al país en dólares) era de 490 puntos el 4/9".
 
-  **Lo que no salió como se esperaba:** (a) el texto creció de 928 a 1.110 palabras, cerca del límite de 1.200, como se había previsto; (b) en las dos corridas con v2 el agente no abrió 3 de los 5 cierres, contra 0 en el control con v1. Con una sola corrida por condición no se puede saber si es un efecto de v2 o variación normal entre corridas; queda registrado como F3; (c) la corrida 2 mostró tres defectos nuevos (F7, F8, F9), dos de ellos consecuencia directa de las reglas que agregó v2. Una salvedad general: cada condición se corrió una sola vez, así que la variación entre corridas de un mismo contrato no está medida.
+  **Lo que no salió como se esperaba:** (a) el texto creció de 928 a 1.110 palabras, cerca del límite de 1.200, como se había previsto; (b) la corrida 2 mostró tres defectos nuevos (F7, F8, F9), y los tres son consecuencia de reglas que agregó v2. Una salvedad general: cada condición se corrió una sola vez, así que la variación entre corridas de un mismo contrato no está medida.
+
+  **Corrección posterior (hito 6).** En este punto había escrito que el control con v1 había abierto todos los archivos y que v2 dejaba 3 cierres sin abrir, y sugerí que podía ser un efecto de v2. Era un error de medición: el script solo registraba qué archivos se abrieron, no cuánto de cada uno. Al medir la cobertura de lectura (líneas leídas de cada archivo) sobre los logs de las cuatro corridas, el patrón es idéntico en todas: **7 de 10 archivos leídos completos** (los cinco dailys y dos cierres) y tres cierres sin leer o casi sin leer. En el control con v1, `mar_cierre`, `mie_cierre` y `jue_cierre` figuraban como abiertos, pero de cada uno se leyeron 6 líneas de unas 1.740. F3 no depende de la versión del contrato.
 - **Commit:** contrato v2 en `0e49579`; evidencia y corrida 2 en el commit del hito 5.
 
 ## 6. Iteración 2
 
-- **Qué falló (textual):** _pendiente_
-- **Pieza del contrato que toqué:** _pendiente_
-- **Cambio (antes → después):** _pendiente_
+**Decisión (tomada con Sebastián el 24/9).** Se plantearon dos opciones. A: tocar **Restricciones** para F3, F4, F5, F8 y F9. B: volver a tocar **Formato** para F7, F8 y F9. Se eligió A porque casi todo lo abierto es "el agente hace algo que no debería o declara algo que no cumplió", y porque F8 (la más seria para el lector) se puede expresar como una prohibición. F7 queda abierta y documentada. Riesgo asumido de A: la regla de las tasas choca con la regla de estilo de v2 ("puntos y no pbs", en Formato). Para no tocar una segunda pieza, la propia regla nueva dice que prevalece sobre la de estilo.
+
+- **Qué falló (textual):**
+  - F3: `| Martes | Sí | Sí | |` con `mar_cierre` sin abrir, y "Insumos leídos: 10/10". Cobertura medida en las cuatro corridas: 7 de 10 archivos completos.
+  - F4: "Reunión del 16/9" para la Fed en la semana A, cuando el daily dice solo "la semana que viene". Y la paráfrasis "entre los sectores que más aportaron al PBI" cuando la fuente dice "sobresalieron".
+  - F5: `[jue-daily] [lun-daily]` cuando el texto citado está solo en el del jueves.
+  - F8: "La Reserva Federal de EE.UU. subió la tasa 25 puntos, a 3,75%-4,00%", que es un cuarto de punto porcentual.
+  - F9: "Sin precio inicial no se puede evaluar el cambio de la semana" en la tabla y "Cresud (empresa agro) subió 4,9% en la semana" en 4.2.
+- **Pieza del contrato que toqué:** Restricciones (sección 4 de `system_prompt.md`). Formato, Ejemplos y user prompt no cambiaron. La diferencia entre [`iteraciones/v2/`](iteraciones/v2/system_prompt.md) y [`iteraciones/v3/`](iteraciones/v3/system_prompt.md) son exactamente cinco líneas nuevas.
+- **Cambio (antes → después):** antes, la sección 4 tenía 9 reglas. Después, tiene 14; se agregaron:
+  - **Control de insumos:** marcar "Sí" solo si leyó el archivo de principio a fin (aunque sea en varios tramos); si solo lo consultó con búsquedas o leyó una parte, "No" y aclararlo en Observaciones; "Insumos leídos" cuenta solo los "Sí".
+  - **Fechas, plazos y cifras:** solo si figuran en los informes o se deducen directamente de algo que figura (con el ejemplo de "el miércoles" dicho un lunes 14); sin completar con el calendario; sin afirmar más de lo que dice la fuente.
+  - **Fuentes:** cada etiqueta `[día-tipo]` apunta a un archivo donde figura lo que se afirma; sin etiquetas "por las dudas".
+  - **Tasas de interés:** no escribir "puntos" a secas para el cambio de una tasa; escribir "puntos porcentuales" con el valor real (0,25 y no 25). Prevalece sobre la regla de estilo de Formato.
+  - **Coherencia:** el informe no se contradice; si un dato figura en una sección, otra no puede decir que falta o que no se puede calcular.
+- **Cómo se mide el después.** Con [`scripts/validar_salida.py --spec v3`](scripts/validar_salida.py), que agrega tres chequeos mecánicos: el "Insumos leídos" coincide con la cantidad de "Sí"; cada "Sí" es un archivo que el agente leyó completo (usa la cobertura de lectura que ahora guarda el `.meta.json`); y no hay "N puntos" a secas para tasas de interés (heurística). Sobre la corrida 2 (v2), el validador v3 da 25/29 y detecta exactamente F3 y F8. Las reglas de fechas, fuentes y coherencia no se pueden chequear con un script: se revisan a mano contra los insumos.
+- **Qué espero ver, y qué podría salir mal:** F8 en cero. Para F3, una de dos: el agente lee los diez archivos completos (más lento y más caro) o marca "No" en los cierres que no leyó y declara 7/10; cualquiera de las dos es coherente. Riesgos: que el agente ignore la regla de las tasas por la de estilo, y que para cumplir la de coherencia quite información en lugar de reconciliarla.
 - **Qué cambió en la salida:** _pendiente_
 - **Commit:** _pendiente_
 

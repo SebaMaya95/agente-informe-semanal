@@ -56,6 +56,36 @@ def sha(texto):
     return hashlib.sha256(texto.encode("utf-8")).hexdigest()[:16]
 
 
+def cobertura_de_lectura(base, carpeta, lecturas):
+    """Cuánto de cada insumo abrió realmente el agente con la herramienta Read.
+
+    base: carpeta donde están los .txt (la carpeta de trabajo del agente); carpeta: insumos/semana_<lunes>;
+    lecturas: lista de (ruta relativa a base, offset, limit) de las llamadas a Read que no dieron error.
+    Un Read sin offset ni limit cubre como máximo las primeras 2.000 líneas. Una búsqueda (Grep) no cuenta como lectura.
+    Estados: "completo" (cubre todas las líneas), "parcial" o "no abierto".
+    """
+    out = {}
+    for d in ("lun", "mar", "mie", "jue", "vie"):
+        for t in ("daily", "cierre"):
+            rel = f"{carpeta}/{d}_{t}.txt".replace("\\", "/")
+            ruta = os.path.join(base, rel)
+            if not os.path.exists(ruta):
+                continue
+            with open(ruta, encoding="utf-8") as f:
+                n = len(f.read().splitlines())
+            cubiertas, abierto = set(), False
+            for r, off, lim in lecturas:
+                if r != rel:
+                    continue
+                abierto = True
+                ini = max(int(off), 1) if off else 1
+                fin = ini + int(lim) - 1 if lim else ini + 1999
+                cubiertas.update(range(ini, min(fin, n) + 1))
+            estado = "no abierto" if not abierto else ("completo" if len(cubiertas) >= n else "parcial")
+            out[rel] = {"lineas": n, "lineas_leidas": len(cubiertas), "estado": estado}
+    return out
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--lunes", required=True, help="fecha del lunes de la semana, AAAA-MM-DD")
@@ -124,7 +154,7 @@ def main():
         with open(args.log, "w", encoding="utf-8") as f:
             f.write(p.stdout)
 
-    leidos, resultado, init = [], {}, {}
+    leidos, lecturas, fallidas, resultado, init = [], [], set(), {}, {}
     for linea in p.stdout.splitlines():
         try:
             ev = json.loads(linea)
@@ -137,7 +167,13 @@ def main():
             for bloque in ev.get("message", {}).get("content", []):
                 if bloque.get("type") == "tool_use" and bloque.get("name") == "Read":
                     inp = bloque.get("input", {})
-                    leidos.append(inp.get("file_path") or inp.get("path"))
+                    ruta_leida = inp.get("file_path") or inp.get("path")
+                    leidos.append(ruta_leida)
+                    lecturas.append((bloque.get("id"), ruta_leida, inp.get("offset"), inp.get("limit")))
+        elif tipo == "user":
+            for bloque in ev.get("message", {}).get("content", []):
+                if isinstance(bloque, dict) and bloque.get("type") == "tool_result" and bloque.get("is_error"):
+                    fallidas.add(bloque.get("tool_use_id"))
         elif tipo == "result":
             resultado = ev
 
@@ -152,6 +188,8 @@ def main():
     salida_ok = os.path.exists(escrito)
     if aislado and salida_ok:
         shutil.copy2(escrito, destino)
+    lecturas_ok = [(relativa(r), o, l) for i, r, o, l in lecturas if r and i not in fallidas]
+    cobertura = cobertura_de_lectura(cwd, carpeta, lecturas_ok)   # antes de borrar la carpeta temporal
 
     meta = {
         "fecha_hora": inicio.isoformat(timespec="seconds"),
@@ -169,6 +207,7 @@ def main():
         "archivos_leidos_distintos": distintos,
         "fuera_de_la_semana": [d for d in distintos if not d.startswith(carpeta.replace("\\", "/"))],
         "insumos_esperados_no_leidos": [e for e in esperados if e not in distintos],
+        "cobertura_de_lectura": cobertura,
         "llamadas_a_read": len(leidos),
         "turnos": resultado.get("num_turns"),
         "duracion_s": round((resultado.get("duration_ms") or 0) / 1000),
@@ -180,10 +219,12 @@ def main():
     with open(destino + ".meta.json", "w", encoding="utf-8") as f:
         json.dump(meta, f, ensure_ascii=False, indent=2)
 
-    print(json.dumps({k: meta[k] for k in ("modelo_resuelto", "entorno_aislado", "salida_escrita_por_el_agente",
-                                            "llamadas_a_read", "fuera_de_la_semana", "turnos", "duracion_s", "tokens",
-                                            "insumos_esperados_no_leidos", "respuesta_final_del_agente",
-                                            "codigo_de_salida_cli")}, ensure_ascii=False, indent=2))
+    resumen = {k: meta[k] for k in ("modelo_resuelto", "entorno_aislado", "salida_escrita_por_el_agente",
+                                    "llamadas_a_read", "fuera_de_la_semana", "turnos", "duracion_s", "tokens",
+                                    "respuesta_final_del_agente", "codigo_de_salida_cli")}
+    resumen["lectura_completa"] = sum(1 for v in cobertura.values() if v["estado"] == "completo")
+    resumen["lectura_parcial_o_ninguna"] = {k.split("/")[-1]: v["estado"] for k, v in cobertura.items() if v["estado"] != "completo"}
+    print(json.dumps(resumen, ensure_ascii=False, indent=2))
     if p.returncode != 0 or resultado.get("is_error") or not salida_ok:
         print("\nERROR. stderr del CLI:\n" + p.stderr[-1500:])
         print(f"(se conserva la carpeta de trabajo: {cwd})" if aislado else "")

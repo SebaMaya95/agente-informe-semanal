@@ -1,13 +1,18 @@
 """Valida que una salida respete el formato definido en system_prompt.md (sección 5).
 
 Uso, desde la raíz del repo:
-    python scripts/validar_salida.py [--spec v1|v2] salidas/corrida_1_....md [otra.md ...]
+    python scripts/validar_salida.py [--spec v1|v2|v3] salidas/corrida_1_....md [otra.md ...]
 
-Cada versión del contrato tiene su especificación (--spec, por defecto la vigente, v2):
+Cada versión del contrato tiene su especificación (--spec, por defecto la vigente, v3):
   v1: las salidas de la corrida 1 (21 chequeos).
   v2: cambia la tabla 4.1 (columnas, nombres de fila, "Tipo de dato") y agrega las reglas de
       redacción para no especialistas (sin jerga) y los límites de longitud de bullets y celdas,
       que ya estaban escritos en v1 pero no se chequeaban (en la corrida 1 se midieron a mano).
+  v3: agrega los chequeos mecánicos de las reglas nuevas de Restricciones: el "Insumos leídos"
+      coincide con la cantidad de "Sí"; cada "Sí" corresponde a un archivo que el agente leyó
+      completo (usa <salida>.meta.json, que registra la cobertura de lectura); y no hay "N puntos"
+      a secas para cambios de tasas de interés. Las reglas de fechas, fuentes y coherencia no se
+      pueden chequear con un script: se revisan contra los insumos.
 
 Chequea estructura y redacción mecánica, no la calidad del análisis: títulos y orden, columnas
 de las tablas, filas, valores permitidos, fuentes en cada afirmación, extensión, jerga y que no
@@ -15,6 +20,7 @@ aparezca el nombre de la entidad que produce los informes. Sale con código 1 si
 La lista de jerga de v2 se definió a partir de la regla de estilo de v2 y de la jerga que se vio
 en la corrida 1; es una señal mecánica, no una prueba de que el texto sea claro.
 """
+import json
 import os
 import re
 import sys
@@ -62,8 +68,15 @@ SPECS = {
         ],
         "idx_fuente": 6,
         "v2": True,
+        "v3": False,
     },
 }
+# v3: mismas tablas que v2, más los chequeos de las reglas nuevas de Restricciones
+SPECS["v3"] = dict(SPECS["v2"], v3=True)
+
+MAPA_DIAS = {"Lunes": "lun", "Martes": "mar", "Miércoles": "mie", "Jueves": "jue", "Viernes": "vie"}
+# Cambio de una tasa de interés escrito como "N puntos" sin "porcentuales" (regla de Restricciones de v3)
+PUNTOS_A_SECAS = re.compile(r"\b\d+(?:,\d+)?\s+puntos\b(?!\s+porcentuales)")
 
 # Jerga que la regla de estilo de v2 pide evitar. Siglas y códigos: se buscan con mayúsculas exactas.
 JERGA = ["pbs", "puntos básicos", "TEA", "TNA", "TIR", "BCRA", "LECAP", "Lecap", "REM", "IPC", "YTD",
@@ -207,6 +220,44 @@ def validar(ruta, spec_name):
         jerga = jerga_hallada(texto)
         chk("Sin jerga del mercado de capitales (regla de estilo)", not jerga, "; ".join(jerga[:12]) + (" ..." if len(jerga) > 12 else ""))
 
+    if spec.get("v3"):
+        # Control de insumos: coherencia interna y coherencia con lo que el agente abrió de verdad
+        _, filas1 = tabla(sec.get(encabezados[0], ""))
+        n_si = sum(1 for f in filas1 for c in f[1:3] if c == "Sí")
+        m = re.search(r"Insumos leídos:\s*(\d+)/10", sec.get(encabezados[0], ""))
+        chk("1. 'Insumos leídos: n/10' coincide con la cantidad de 'Sí'", m and int(m.group(1)) == n_si,
+            f"declara {m.group(1) if m else '?'} y hay {n_si} 'Sí'")
+        meta_ruta = ruta + ".meta.json"
+        if os.path.exists(meta_ruta):
+            with open(meta_ruta, encoding="utf-8") as fm:
+                meta = json.load(fm)
+            base = f"insumos/semana_{meta['semana_lunes']}"
+            cob = meta.get("cobertura_de_lectura")
+            mal = []
+            for f in filas1:
+                d = MAPA_DIAS.get(f[0])
+                for tipo, celda in (("daily", f[1]), ("cierre", f[2])):
+                    if celda != "Sí" or not d:
+                        continue
+                    rel = f"{base}/{d}_{tipo}.txt"
+                    if cob is not None:
+                        completo = cob.get(rel, {}).get("estado") == "completo"
+                    else:   # metadatos viejos: solo se sabe qué archivos nunca se abrieron
+                        completo = rel not in meta.get("insumos_esperados_no_leidos", [])
+                    if not completo:
+                        mal.append(f"{d}_{tipo}")
+            chk("1. Cada 'Sí' es un archivo que el agente leyó completo (según .meta.json)", not mal,
+                f"marcados 'Sí' sin lectura completa: {mal}")
+        else:
+            r.append(("1. Cada 'Sí' es un archivo leído completo (OMITIDO: falta .meta.json)", None, ""))
+        # Tasas de interés: "puntos" a secas en una oración que habla de tasas (heurística; revisar a mano)
+        sospechosas = []
+        for linea in texto.splitlines():
+            for oracion in re.split(r"(?<=[.;])\s+|\|", linea):
+                if re.search(r"\btasas?\b", oracion, re.I) and "riesgo país" not in oracion.lower() and PUNTOS_A_SECAS.search(oracion):
+                    sospechosas.append(oracion.strip()[:90])
+        chk("Sin 'N puntos' a secas para cambios de tasas de interés (heurística)", not sospechosas, " || ".join(sospechosas[:3]))
+
     if os.path.exists(RUTA_PROHIBIDAS):
         with open(RUTA_PROHIBIDAS, encoding="utf-8") as f:
             prohibidas = [l.strip() for l in f if l.strip()]
@@ -219,7 +270,7 @@ def validar(ruta, spec_name):
 
 if __name__ == "__main__":
     args = sys.argv[1:]
-    spec_name = "v2"
+    spec_name = "v3"
     if "--spec" in args:
         i = args.index("--spec")
         spec_name = args[i + 1]
