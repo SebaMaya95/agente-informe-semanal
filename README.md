@@ -1,6 +1,6 @@
 # Agente de informe semanal: mercado y sector agro
 
-> **Estado:** en construcción. Hito 2 de 7: contrato v1 escrito y congelado, todavía sin correr. Las secciones marcadas como _pendiente_ se completan en el hito que corresponde, justo después de cada corrida y no al final, para que el registro no dependa de la memoria.
+> **Estado:** en construcción. Hito 3 de 7: corrida 1 hecha con el contrato v1; falta decidir la iteración 1. Las secciones marcadas como _pendiente_ se completan en el hito que corresponde, justo después de cada corrida y no al final, para que el registro no dependa de la memoria.
 
 ## 1. La tarea
 
@@ -36,18 +36,51 @@ Cada versión del contrato queda congelada en [`iteraciones/`](iteraciones/) (`v
 1. **Paso 0, manual y fuera del contrato:** los informes llegan por mail con el PDF adjunto; se descargan y se ubican en `insumos/semana_<fecha del lunes>/` con los nombres `lun|mar|mie|jue|vie` + `_daily.pdf` o `_cierre.pdf`. Esa carpeta no se publica.
 2. **Texto plano:** `python scripts/extraer_texto.py` convierte cada PDF en `.txt` (requiere `pypdf`).
 3. **Agente:** `python scripts/preparar_agente.py` arma el agente con el contenido exacto de `system_prompt.md`.
-4. **Invocación:** _pendiente: se documenta cuando quede definido y probado cómo se invoca al agente con el user prompt._
+4. **Invocación:** `python scripts/correr_agente.py --lunes 2026-09-07 --version v1 --archivo corrida_1_semana_2026-09-07.md`. El script usa el CLI de Claude Code en modo no interactivo (requiere `claude auth login`) y:
+   - pasa el contenido de `system_prompt.md` como `--system-prompt`, es decir, como system prompt real y no pegado en el mensaje;
+   - pasa `user_prompt.md`, con la semana, la versión y el archivo de destino completados, como mensaje del usuario;
+   - usa el modelo `sonnet` (en la corrida 1 se resolvió como `claude-sonnet-5`) y le da solo cuatro herramientas: Read, Glob, Grep y Write, sin shell ni web;
+   - deja que el agente escriba el informe en `salidas/` y guarda `salidas/<archivo>.meta.json` con el hash del contrato usado, el modelo, los turnos, los tokens y los archivos que el agente abrió de verdad.
+
+   Está hecho en Python y no en PowerShell porque PowerShell 5.1 rompe las comillas dobles de un texto largo al pasarlo como argumento. Antes de la primera corrida se comprobó que el system prompt llega íntegro: el agente respondió bien siete preguntas puntuales sobre su contenido, incluida la última sección.
 5. **Chequeo de formato:** `python scripts/validar_salida.py salidas/<archivo>.md`.
 
 ## 4. Corridas
 
 | Corrida | Semana | Contrato | Salida | Validador |
 |---|---|---|---|---|
-| 1 | 2026-09-07 al 2026-09-11 | v1 | _pendiente_ | _pendiente_ |
+| 1 | 2026-09-07 al 2026-09-11 | v1 | [`corrida_1_semana_2026-09-07.md`](salidas/corrida_1_semana_2026-09-07.md) | 21/21 |
 | 2 | 2026-09-14 al 2026-09-18 | v2 | _pendiente_ | _pendiente_ |
 | 3 | 2026-09-21 al 2026-09-25 | v3 | _pendiente_ | _pendiente_ |
 
 Además, después de cada cambio de contrato se vuelve a correr la semana anterior con la versión nueva. Esa corrida extra no cuenta entre las tres y sirve para atribuir el cambio en la salida al cambio en el prompt y no a que cambiaron los datos.
+
+### Corrida 1: contrato v1 sobre la semana 2026-09-07
+
+**Cómo fue:** 29 turnos, 571 segundos, modelo `claude-sonnet-5`, 28 llamadas a herramientas (12 Read, 12 Grep, 3 Glob, 1 Write). Los datos completos están en [`salidas/corrida_1_semana_2026-09-07.md.meta.json`](salidas/corrida_1_semana_2026-09-07.md.meta.json). El agente respondió `salidas/corrida_1_semana_2026-09-07.md, 10/10`.
+
+**Qué salió bien (verificado contra los textos de origen, no supuesto):**
+- Estructura: el validador da 21/21. El máximo fue 32 palabras en un bullet, 17 en una celda y 1.010 palabras en total, contra límites de 35, 25 y 1.200.
+- Cifras: contrasté 24 líneas de tablas de cierre (tipo de cambio, brecha, Cresud, Merval, LECAP, Profertil, Bioceres) y unas 25 afirmaciones de los dailys. Todo coincide con el texto de origen, salvo lo señalado en F4 y F5.
+- Contradicciones entre fuentes: el agente detectó y declaró en la sección 5 que el daily y el cierre difieren sobre Cresud (jueves: +6,3% en el cierre contra -1,2% en el daily; martes: +2,0% contra +3,0%). Comprobé que ambas cifras están en las fuentes.
+- El bloque sectorial (4.2) trae datos reales: soja comercializada 53,6% contra 60,1% de promedio, tasas de las ON de Profertil y la caída de Bioceres.
+
+**Qué falló (con evidencia textual):**
+
+- **F1. Las columnas "Cierre lunes" y "Cierre viernes" de la tabla 4.1 no significan lo mismo en todas las filas.** Para las variables que solo existen en los dailys, el agente las llenó con cotizaciones intradía o con datos de otro día:
+  - `| Petróleo (Brent) | 97,3 (intradía) | 104,7 (intradía) | +7,6% |`
+  - `| Treasury 10 años | n/d | 4,92% (intradía) |`
+  - `| Riesgo país | 490 pbs (cierre del 4/9; Globales sin operar el 7/9) | n/d (bajo 500 pbs el 9/9) |`
+
+  El propio agente tuvo que explicarlo en la sección 5: "Brent (lun y vie) y Treasury (vie) son cotizaciones intradía de los dailys". Además el +7,6% del Brent sale de dos cotizaciones tomadas a horas distintas, y el resumen dice que el Brent llegó a US$101,6 el 9/9 mientras la tabla dice 104,7. Con este formato, cada semana podría llenar esas celdas con criterios distintos, y eso rompe la comparabilidad.
+- **F2. Leyó archivos fuera de la semana.** Ejecutó `Glob **/README*` y `Read README.md`, aunque la restricción dice "Usá solo la información de los archivos de la semana". Esta corrida no aisló el entorno: el agente corría dentro del repo y podía ver todo.
+- **F3. "Insumos leídos: 10/10" es una afirmación demasiado generosa.** `mie_cierre.txt` nunca se abrió con Read: solo apareció en búsquedas con Grep y la salida no lo cita ni una vez (0 etiquetas `[mie-cierre]`). `jue_cierre` y `vie_cierre` se leyeron por tramos. Aun así, la fila del miércoles dice `| Miércoles | Sí | Sí | |`, sin observaciones.
+- **F4. Una fecha que no está en los informes.** La expectativa 5 dice "Reunión del 16/9". Ningún daily de la semana menciona esa fecha: el del lunes dice "la semana que viene" y el del viernes "la reunión de septiembre". Es conocimiento externo, que la restricción prohíbe.
+- **F5. Una etiqueta de fuente de más.** La expectativa 2 cita `[jue-daily] [lun-daily]`, pero el texto sobre "FX estable" y commodities está solo en el del jueves.
+
+**Lectura:** el validador aprobó 21 de 21 y aun así hay cinco fallas de fondo. Un chequeo de estructura no reemplaza leer el contenido contra las fuentes. Ninguna de las cinco es un error de cifras: son fallas de contrato (formato ambiguo, restricciones que no se cumplen) y de entorno.
+
+**Decisión pendiente:** qué pieza del contrato tocar en la iteración 1.
 
 ## 5. Iteración 1
 
