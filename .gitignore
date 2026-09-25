@@ -4,3 +4,6 @@ insumos/
 *.pdf
 *.eml
 *.msg
+
+# Agente generado a partir de system_prompt.md (scripts/preparar_agente.py) y config local
+.claude/
