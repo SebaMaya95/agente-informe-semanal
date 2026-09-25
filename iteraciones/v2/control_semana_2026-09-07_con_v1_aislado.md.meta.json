@@ -1,0 +1,58 @@
+{
+  "fecha_hora": "2026-09-24T22:50:07",
+  "semana_lunes": "2026-09-07",
+  "contrato": "v1",
+  "system_prompt_sha256_16": "22d58e0c3a07d399",
+  "user_prompt_sha256_16": "2feda63bd3976274",
+  "modelo_solicitado": "sonnet",
+  "modelo_resuelto": "claude-sonnet-5",
+  "herramientas": [
+    "Read",
+    "Glob",
+    "Grep",
+    "Write"
+  ],
+  "entorno_aislado": true,
+  "banderas_del_cli": [
+    "--model",
+    "sonnet",
+    "--tools",
+    "Read,Glob,Grep,Write",
+    "--permission-mode",
+    "acceptEdits",
+    "--permission-prompts",
+    "none",
+    "--output-format",
+    "stream-json",
+    "--verbose",
+    "--no-session-persistence",
+    "--restricted"
+  ],
+  "archivo_salida": "iteraciones/v2/control_semana_2026-09-07_con_v1_aislado.md",
+  "salida_escrita_por_el_agente": true,
+  "archivos_leidos_distintos": [
+    "insumos/semana_2026-09-07/jue_cierre.txt",
+    "insumos/semana_2026-09-07/jue_daily.txt",
+    "insumos/semana_2026-09-07/lun_cierre.txt",
+    "insumos/semana_2026-09-07/lun_daily.txt",
+    "insumos/semana_2026-09-07/mar_cierre.txt",
+    "insumos/semana_2026-09-07/mar_daily.txt",
+    "insumos/semana_2026-09-07/mie_cierre.txt",
+    "insumos/semana_2026-09-07/mie_daily.txt",
+    "insumos/semana_2026-09-07/vie_cierre.txt",
+    "insumos/semana_2026-09-07/vie_daily.txt"
+  ],
+  "fuera_de_la_semana": [],
+  "insumos_esperados_no_leidos": [],
+  "llamadas_a_read": 12,
+  "turnos": 21,
+  "duracion_s": 143,
+  "tokens": {
+    "input_tokens": 20,
+    "output_tokens": 14396,
+    "cache_read_input_tokens": 760011,
+    "cache_creation_input_tokens": 131183
+  },
+  "respuesta_final_del_agente": "salidas/control_semana_2026-09-07_con_v1_aislado.md, 10/10",
+  "codigo_de_salida_cli": 0
+}

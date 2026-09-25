@@ -1,6 +1,6 @@
 # Agente de informe semanal: mercado y sector agro
 
-> **Estado:** en construcción. Hito 4 de 7: iteración 1 escrita (contrato v2), todavía sin correr. Las secciones marcadas como _pendiente_ se completan en el hito que corresponde, justo después de cada corrida y no al final, para que el registro no dependa de la memoria.
+> **Estado:** en construcción. Hito 5 de 7: corrida 2 hecha con v2 y evidencia de la iteración 1; falta decidir la iteración 2. Las secciones marcadas como _pendiente_ se completan en el hito que corresponde, justo después de cada corrida y no al final, para que el registro no dependa de la memoria.
 
 ## 1. La tarea
 
@@ -45,13 +45,14 @@ Cada versión del contrato queda congelada en [`iteraciones/`](iteraciones/) (`v
 
    Está hecho en Python y no en PowerShell porque PowerShell 5.1 rompe las comillas dobles de un texto largo al pasarlo como argumento. Antes de la primera corrida se comprobó que el system prompt llega íntegro: el agente respondió bien siete preguntas puntuales sobre su contenido, incluida la última sección.
 5. **Chequeo de formato:** `python scripts/validar_salida.py --spec v2 salidas/<archivo>.md`.
+6. **Revisión de contenido:** el validador no juzga si lo que dice el informe es cierto. Para eso se contrastan las afirmaciones contra los textos de origen y se usa como ayuda `python scripts/chequear_cifras.py salidas/<archivo>.md <fecha del lunes>`, que lista las cifras específicas (tres o más dígitos) que no aparecen en los insumos. Las cifras cortas (0,5; 3,5) aparecen por casualidad en cualquier texto, por eso no se chequean, y las calculadas por el agente hay que recalcularlas a mano.
 
 ## 4. Corridas
 
 | Corrida | Semana | Contrato | Salida | Validador |
 |---|---|---|---|---|
-| 1 | 2026-09-07 al 2026-09-11 | v1 | [`corrida_1_semana_2026-09-07.md`](salidas/corrida_1_semana_2026-09-07.md) | 21/21 |
-| 2 | 2026-09-14 al 2026-09-18 | v2 | _pendiente_ | _pendiente_ |
+| 1 | 2026-09-07 al 2026-09-11 | v1 | [`corrida_1_semana_2026-09-07.md`](salidas/corrida_1_semana_2026-09-07.md) | 21/21 (spec v1) |
+| 2 | 2026-09-14 al 2026-09-18 | v2 | [`corrida_2_semana_2026-09-14.md`](salidas/corrida_2_semana_2026-09-14.md) | 24/26 (spec v2) |
 | 3 | 2026-09-21 al 2026-09-25 | v3 | _pendiente_ | _pendiente_ |
 
 Además, después de cada cambio de contrato se vuelve a correr la semana anterior con la versión nueva. Esa corrida extra no cuenta entre las tres y sirve para atribuir el cambio en la salida al cambio en el prompt y no a que cambiaron los datos.
@@ -85,6 +86,23 @@ Además, después de cada cambio de contrato se vuelve a correr la semana anteri
 
 **Decisión (tomada con Sebastián el 24/9):** la iteración 1 toca solo la pieza **Formato** y ataca F1 y F6, que son fallas de la forma de la salida: cómo se arma la tabla y cómo se escribe. F2 se corrige con un cambio de entorno y no de contrato (sección 3). F3, F4 y F5 son fallas de Restricciones y quedan para la iteración 2, que se confirma con lo que muestre la corrida 2. Una salvedad: la clase ubica el tono dentro de Restricciones; acá la redacción se incluyó en Formato porque define la forma de lo que se entrega y el pedido llegó junto con el cambio de la tabla. Es una decisión discutible y queda registrada.
 
+### Corrida 2: contrato v2 sobre la semana 2026-09-14
+
+**Cómo fue:** entorno aislado, 20 turnos, 203 segundos, modelo `claude-sonnet-5`; no abrió ningún archivo fuera de la semana (`fuera_de_la_semana: []`), así que F2 quedó resuelta. Metadatos en [`salidas/corrida_2_semana_2026-09-14.md.meta.json`](salidas/corrida_2_semana_2026-09-14.md.meta.json). Es la semana con el cierre del lunes en inglés.
+
+**Qué salió bien (verificado contra los textos de origen):**
+- Contrasté unas 30 afirmaciones: tasa de la Fed y su probabilidad, decisiones del Banco de Japón y del Banco de Inglaterra, riesgo país (485, 510, 515), reservas, Presupuesto 2027, fechas de la licitación, compras del Banco Central (123 y 169 millones), liquidación del agro, Cresud (precio y variación semanal), Treasury (4,99%, 5% y 4,92%), caución, Brent y los valores del dólar de ambos cierres, incluido el lunes en inglés. Todo coincide con las fuentes. Las 5 cifras que la herramienta marca como "no aparecen" son valores con un decimal en la fuente (`1.510,3`) que el agente completó con un cero (`1.510,30`).
+- La "Reunión del 16/9" de la Fed, que en la semana A era conocimiento externo, acá sí está justificada: el daily del lunes dice "el miércoles" y el agente calculó la fecha.
+- **El cierre del lunes en inglés lo resolvió bien sin ninguna regla.** Anotó en el control de insumos "El cierre no incluye tablas de acciones", dejó `n/d` el precio inicial de Cresud y lo explicó en la sección 5. Las irregularidades que v1 y v2 no contemplaban a propósito no requirieron una regla.
+- Jerga: 1 término distinto y 2 apariciones (`caución`).
+
+**Qué falló:**
+- **F3 se repite.** `mar_cierre`, `mie_cierre` y `jue_cierre` nunca se abrieron con Read (solo búsquedas), y aun así el control dice `| Martes | Sí | Sí | |` y "Insumos leídos: 10/10", sin observaciones. En la re-corrida de v2 sobre la semana A el agente sí lo aclaró ("Cierre consultado solo en dólar y Cresud"), así que el mismo contrato produce dos comportamientos distintos.
+- **F7. "Tipo de dato" dice `n/d` cuando hay un valor.** La regla de v2 dice "`n/d` si no hay dato" y no aclara qué pasa cuando falta solo uno de los dos extremos: `| Tasa de EE.UU. a 10 años | n/d | 4,92% (dato del 17/9) | n/d | n/d |` y `| Acción de Cresud | n/d | $2.042,00 (dato del 18/9) | n/d | n/d |`.
+- **F8. La regla de estilo de v2 generó una ambigüedad nueva.** v2 pide "puntos y no pbs". Para el riesgo país funciona, pero para las tasas de interés no: el informe dice "La Reserva Federal de EE.UU. subió la tasa 25 puntos, a 3,75%-4,00%" y "El Banco de Japón subiría la tasa 25 puntos, a 1,25%". Un lector no especialista puede entender que la tasa subió 25 puntos porcentuales, cuando la fuente habla de 25 puntos básicos, es decir 0,25 puntos porcentuales.
+- **F9. Una contradicción dentro del mismo informe.** La tabla 4.1 dice sobre Cresud "Sin precio inicial no se puede evaluar el cambio de la semana", y la sección 4.2 dice "Cresud (empresa agro) subió 4,9% en la semana [vie-cierre]". El cierre del viernes trae la variación semanal, pero v2 obliga a `n/d` en "Cambio" si no hay dos valores de cierre.
+- Residuales: una viñeta de 44 palabras en la sección 5 (límite 35) y una paráfrasis más fuerte que la fuente: el informe dice que el agro está "entre los sectores que más aportaron al PBI", pero el daily dice que "sobresalieron" Pesca, Minería y Agro por su crecimiento y no habla de aporte.
+
 ## 5. Iteración 1
 
 - **Qué falló (textual):** F1 y F6 de la corrida 1. Las dos citas más claras: `| Petróleo (Brent) | 97,3 (intradía) | 104,7 (intradía) | +7,6% |` (columnas de "Cierre" con cotizaciones de la mañana) y "Caución cerca de 20% TNA; TEA de la S13N6 de 27,56% a 28,08%" (jerga sin explicar). Medición del antes: 18 términos técnicos distintos y 52 apariciones.
@@ -110,8 +128,27 @@ Además, después de cada cambio de contrato se vuelve a correr la semana anteri
   - **Cómo se completa la tabla 4.1:** "Inicio/Fin de semana" es el valor del cierre si la variable está en las tablas de cierre y, si solo está en los dailys, el último valor que cita el daily con su fecha. "Tipo de dato" solo puede ser `Cierre`, `Daily`, `Mixto` o `n/d`. "Cambio" se calcula solo cuando el tipo es `Cierre`; en cualquier otro caso, `n/d`.
   - **Cómo se escribe:** el lector trabaja en el agro y no es especialista en finanzas; frases cortas y una idea por frase; reemplazar la jerga por palabras comunes con ejemplos (Banco Central y no BCRA, puntos y no pbs, tasa de interés anual y no TEA o TNA, renovación de deuda y no rollover, durante el día y no intradía); explicar entre paréntesis lo que no se pueda reemplazar; montos con unidad y sin "M".
 - **Qué espero ver, y qué podría salir mal:** en el validador (spec v2), F1 y F6 en cero. El riesgo principal es que las variables que solo salen de los dailys queden sin cambio numérico (`n/d`), lo que es más honesto pero menos informativo, y que explicar los términos alargue el texto hasta el límite de 1.200 palabras.
-- **Qué cambió en la salida:** _pendiente: se completa con la re-corrida de la semana 2026-09-07 con v2, para comparar con la corrida 1 sobre los mismos datos, y con la corrida 2._
-- **Commit:** "Hito 4: iteración 1, contrato v2 (Formato)". El hash se agrega en el commit siguiente.
+- **Qué cambió en la salida:** para separar el efecto del contrato del efecto del aislamiento, se compararon dos corridas sobre **los mismos datos (semana 2026-09-07) y el mismo entorno aislado**: un control con v1 y una re-corrida con v2. Ambas están en [`iteraciones/v2/`](iteraciones/v2/) con sus metadatos. La corrida 1 original, que no estaba aislada, se muestra aparte.
+
+  | | Corrida 1 (v1, sin aislar) | Control (v1, aislado) | Re-corrida (v2, aislado) |
+  |---|---|---|---|
+  | Jerga: términos distintos / apariciones | 18 / 52 | 12 / 26 | **1 / 1** |
+  | Chequeos de la spec v2 aprobados | 22/26 | 22/26 | **25/26** |
+  | Filas de la tabla 4.1 con datos de daily y "Cambio" numérico | 1 | 2 | **0** |
+  | Columna "Tipo de dato" | no existe | no existe | en las 10 filas |
+  | Palabras (límite 1.200) | 1.010 | 928 | 1.110 |
+  | Cierres que el agente nunca abrió | 1 | 0 | 3 |
+
+  Antes y después de F1, misma variable y mismos datos:
+  - Control (v1): `| Petróleo (Brent) | US$97,3 (apertura del lunes) | US$104,7 (dato del viernes, no cierre) | +7,6% aprox. |`. El agente ya avisaba de que no eran cierres, pero igual calculaba el cambio.
+  - Re-corrida (v2): `| Petróleo (Brent) | US$97,3 (dato del 7/9) | US$104,7 (dato del 11/9) | n/d | Daily |`.
+
+  Antes y después de F6, misma idea:
+  - Control (v1): "Las tasas en pesos siguieron cerca de 20% TNA y el Tesoro salió a renovar $8,1 billones con instrumentos cortos" y "El riesgo país figuraba en 490 pbs el lunes".
+  - Re-corrida (v2): "Las tasas en pesos siguieron cerca de 20% anual y el Tesoro ofreció solo instrumentos cortos en su licitación del viernes" y "El riesgo país (costo de financiar al país en dólares) era de 490 puntos el 4/9".
+
+  **Lo que no salió como se esperaba:** (a) el texto creció de 928 a 1.110 palabras, cerca del límite de 1.200, como se había previsto; (b) en las dos corridas con v2 el agente no abrió 3 de los 5 cierres, contra 0 en el control con v1. Con una sola corrida por condición no se puede saber si es un efecto de v2 o variación normal entre corridas; queda registrado como F3; (c) la corrida 2 mostró tres defectos nuevos (F7, F8, F9), dos de ellos consecuencia directa de las reglas que agregó v2. Una salvedad general: cada condición se corrió una sola vez, así que la variación entre corridas de un mismo contrato no está medida.
+- **Commit:** contrato v2 en `0e49579`; evidencia y corrida 2 en el commit del hito 5.
 
 ## 6. Iteración 2
 
