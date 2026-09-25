@@ -1,0 +1,6 @@
+# Insumos: informes originales (daily y cierre). NO se publican.
+# Solo se versionan los prompts, las salidas y el README.
+insumos/
+*.pdf
+*.eml
+*.msg
