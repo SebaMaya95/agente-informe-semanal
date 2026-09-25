@@ -1,0 +1,110 @@
+{
+  "fecha_hora": "2026-09-24T23:09:31",
+  "semana_lunes": "2026-09-14",
+  "contrato": "v3",
+  "system_prompt_sha256_16": "139ddb4e93ef8a71",
+  "user_prompt_sha256_16": "345842ae840f1dd3",
+  "modelo_solicitado": "sonnet",
+  "modelo_resuelto": "claude-sonnet-5",
+  "herramientas": [
+    "Read",
+    "Glob",
+    "Grep",
+    "Write"
+  ],
+  "entorno_aislado": true,
+  "banderas_del_cli": [
+    "--model",
+    "sonnet",
+    "--tools",
+    "Read,Glob,Grep,Write",
+    "--permission-mode",
+    "acceptEdits",
+    "--permission-prompts",
+    "none",
+    "--output-format",
+    "stream-json",
+    "--verbose",
+    "--no-session-persistence",
+    "--restricted"
+  ],
+  "archivo_salida": "iteraciones/v3/evidencia_semana_2026-09-14_con_v3_b.md",
+  "salida_escrita_por_el_agente": true,
+  "archivos_leidos_distintos": [
+    "insumos/semana_2026-09-14/jue_cierre.txt",
+    "insumos/semana_2026-09-14/jue_daily.txt",
+    "insumos/semana_2026-09-14/lun_cierre.txt",
+    "insumos/semana_2026-09-14/lun_daily.txt",
+    "insumos/semana_2026-09-14/mar_cierre.txt",
+    "insumos/semana_2026-09-14/mar_daily.txt",
+    "insumos/semana_2026-09-14/mie_cierre.txt",
+    "insumos/semana_2026-09-14/mie_daily.txt",
+    "insumos/semana_2026-09-14/vie_cierre.txt",
+    "insumos/semana_2026-09-14/vie_daily.txt"
+  ],
+  "fuera_de_la_semana": [],
+  "insumos_esperados_no_leidos": [],
+  "cobertura_de_lectura": {
+    "insumos/semana_2026-09-14/lun_daily.txt": {
+      "lineas": 622,
+      "lineas_leidas": 622,
+      "estado": "completo"
+    },
+    "insumos/semana_2026-09-14/lun_cierre.txt": {
+      "lineas": 1505,
+      "lineas_leidas": 1505,
+      "estado": "completo"
+    },
+    "insumos/semana_2026-09-14/mar_daily.txt": {
+      "lineas": 554,
+      "lineas_leidas": 554,
+      "estado": "completo"
+    },
+    "insumos/semana_2026-09-14/mar_cierre.txt": {
+      "lineas": 1738,
+      "lineas_leidas": 1738,
+      "estado": "completo"
+    },
+    "insumos/semana_2026-09-14/mie_daily.txt": {
+      "lineas": 446,
+      "lineas_leidas": 446,
+      "estado": "completo"
+    },
+    "insumos/semana_2026-09-14/mie_cierre.txt": {
+      "lineas": 1742,
+      "lineas_leidas": 1742,
+      "estado": "completo"
+    },
+    "insumos/semana_2026-09-14/jue_daily.txt": {
+      "lineas": 514,
+      "lineas_leidas": 514,
+      "estado": "completo"
+    },
+    "insumos/semana_2026-09-14/jue_cierre.txt": {
+      "lineas": 1740,
+      "lineas_leidas": 1740,
+      "estado": "completo"
+    },
+    "insumos/semana_2026-09-14/vie_daily.txt": {
+      "lineas": 627,
+      "lineas_leidas": 627,
+      "estado": "completo"
+    },
+    "insumos/semana_2026-09-14/vie_cierre.txt": {
+      "lineas": 1753,
+      "lineas_leidas": 1753,
+      "estado": "completo"
+    }
+  },
+  "llamadas_a_read": 24,
+  "turnos": 27,
+  "duracion_s": 316,
+  "tokens": {
+    "input_tokens": 18,
+    "output_tokens": 36386,
+    "cache_read_input_tokens": 1337446,
+    "cache_creation_input_tokens": 335416
+  },
+  "respuesta_final_del_agente": "salidas/evidencia_semana_2026-09-14_con_v3_b.md, 10/10",
+  "codigo_de_salida_cli": 0
+}

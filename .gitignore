@@ -7,3 +7,7 @@ insumos/
 
 # Agente generado a partir de system_prompt.md (scripts/preparar_agente.py) y config local
 .claude/
+
+# Bytecode de Python (incluye rutas locales de quien lo genera)
+__pycache__/
+*.pyc

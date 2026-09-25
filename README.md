@@ -1,6 +1,6 @@
 # Agente de informe semanal: mercado y sector agro
 
-> **Estado:** en construcción. Hito 6 de 7: iteración 2 escrita (contrato v3), todavía sin correr; la corrida 3 espera los informes del viernes 25/9. Las secciones marcadas como _pendiente_ se completan en el hito que corresponde, justo después de cada corrida y no al final, para que el registro no dependa de la memoria.
+> **Estado:** en construcción. Hito 6 de 7: iteración 2 (contrato v3) con evidencia. Falta la corrida 3, que espera los informes del viernes 25/9, y la comparación y la reflexión finales. Las secciones marcadas como _pendiente_ se completan en el hito que corresponde, justo después de cada corrida y no al final, para que el registro no dependa de la memoria.
 
 ## 1. La tarea
 
@@ -171,8 +171,38 @@ Además, después de cada cambio de contrato se vuelve a correr la semana anteri
   - **Coherencia:** el informe no se contradice; si un dato figura en una sección, otra no puede decir que falta o que no se puede calcular.
 - **Cómo se mide el después.** Con [`scripts/validar_salida.py --spec v3`](scripts/validar_salida.py), que agrega tres chequeos mecánicos: el "Insumos leídos" coincide con la cantidad de "Sí"; cada "Sí" es un archivo que el agente leyó completo (usa la cobertura de lectura que ahora guarda el `.meta.json`); y no hay "N puntos" a secas para tasas de interés (heurística). Sobre la corrida 2 (v2), el validador v3 da 25/29 y detecta exactamente F3 y F8. Las reglas de fechas, fuentes y coherencia no se pueden chequear con un script: se revisan a mano contra los insumos.
 - **Qué espero ver, y qué podría salir mal:** F8 en cero. Para F3, una de dos: el agente lee los diez archivos completos (más lento y más caro) o marca "No" en los cierres que no leyó y declara 7/10; cualquiera de las dos es coherente. Riesgos: que el agente ignore la regla de las tasas por la de estilo, y que para cumplir la de coherencia quite información en lugar de reconciliarla.
-- **Qué cambió en la salida:** _pendiente_
-- **Commit:** _pendiente_
+- **Qué cambió en la salida:** se compararon cuatro corridas sobre **los mismos datos (semana 2026-09-14) y el mismo entorno aislado**: dos con v2 (la corrida 2 y una repetición) y dos con v3 (a y b). Las cuatro están en [`salidas/`](salidas/corrida_2_semana_2026-09-14.md) e [`iteraciones/v3/`](iteraciones/v3/) con sus metadatos. Con dos observaciones por condición se ve cuánto varía cada contrato consigo mismo.
+
+  | | v2 · corrida 2 | v2 · repetición | v3 · a | v3 · b |
+  |---|---|---|---|---|
+  | Chequeos de la spec v3 | 25/29 | 25/29 | **28/29** | **28/29** |
+  | "Sí" en cierres sin lectura completa (F3) | 3 | 3 | **0** | **0** |
+  | Archivos leídos completos (de 10) | 7 | 7 | **10** | **10** |
+  | "25 puntos" a secas para tasas (F8) | 4 | 3 | **0** | **0** |
+  | "0,25 puntos porcentuales" | 0 | 0 | 3 | 3 |
+  | Contradicción Cresud tabla / 4.2 (F9, revisión a mano) | sí | sí | **no** | **no** |
+  | Jerga: términos distintos / apariciones | 1 / 2 | 1 / 1 | 1 / 1 | 1 / 1 |
+  | Palabras (límite 1.200) | 1.057 | 1.095 | 967 | 1.107 |
+  | Turnos / segundos / tokens de salida | 20 / 203 / 21k | 19 / 184 / 20k | 28 / 446 / 52k | 27 / 316 / 36k |
+
+  Antes y después, misma idea:
+  - **F8.** v2: "La Reserva Federal de EE.UU. subió la tasa 25 puntos, a 3,75%-4,00%". v3: "La Reserva Federal (Fed, banco central de EE.UU.) subió su tasa de referencia 0,25 puntos porcentuales, hasta un rango de 3,75%-4,00%". La misma corrección apareció en las expectativas: "Japón subió 0,25 puntos porcentuales".
+  - **F3.** v2: `| Martes | Sí | Sí | |` con `mar_cierre` sin abrir. v3: el agente hizo 24 lecturas y abrió los diez archivos de principio a fin en las dos corridas, de modo que cada "Sí" está respaldado. La regla admitía también marcar "No" y declarar 7/10; ninguna de las dos corridas eligió esa vía.
+  - **F4.** v2: el agro "entre los sectores que más aportaron al PBI". v3: "entre los sectores que sobresalieron junto con pesca (+44,7%) y minería (+16,4%)", que es lo que dice la fuente. Las fechas ("el miércoles 16/9") se dedujeron de un dato que figura en el daily, como pedía la regla.
+  - **F9.** v2: la tabla dice "Sin precio inicial no se puede evaluar el cambio de la semana" y 4.2 dice "subió 4,9% en la semana". v3: ninguna de las dos corridas se contradice.
+  - **F5.** No hay una medición mecánica. En la revisión a mano no aparecieron etiquetas de fuente de más en las corridas con v3.
+
+  **Verificación de contenido de las corridas con v3:** todas las cifras específicas que la herramienta no encuentra son valores con un decimal menos en la fuente (`1.510,3`, `2.042,0`) que el agente completó con un cero. Las afirmaciones dudosas se revisaron a mano contra los textos y coinciden (por ejemplo "agosto de 2016" para el récord de urea, "supuestos macroeconómicos un tanto exigentes", Merval en 1.886,1, Cresud en 1.890,0, "dos subas en 2027" según los futuros).
+
+  **Lo que no salió como se esperaba:**
+  - **El costo subió.** Leer los diez archivos completos duplicó el tiempo (de 184-203 a 316-446 segundos) y casi duplicó los tokens de salida. La corrección de F3 se pagó con más cómputo; la alternativa (marcar "No" y declarar 7/10) habría salido más barata.
+  - **La regla de coherencia se cumplió quitando información.** Era el riesgo que se había anotado antes de correr. La variación semanal de Cresud (+4,9%), que el cierre del viernes trae, desapareció de las dos corridas con v3 en lugar de reconciliarse con la tabla: F9 se eliminó, pero se perdió un dato.
+  - **F7 sigue.** "Tipo de dato" dice `n/d` cuando hay un valor en 3 de las 4 corridas (2 filas en cada una, salvo v3·b). No era objetivo de esta iteración.
+  - **Jerga residual.** `A3500` aparece una vez en la sección 5 de las dos corridas con v3, y la v3·a agrega la sigla "BCS", que no está en la lista del validador.
+  - **F10, nueva y abierta: la tabla 4.1 no define qué serie usar.** El cierre trae varias series para la misma variable y cada corrida elige una. Sobre los mismos datos, en las cuatro corridas: "Dólar oficial" usó `BCRA 3500` en tres y el dólar *spot* en una (variación de +0,1% contra +0,5%); "Dólar bolsa (MEP)" usó la serie con GD30 en tres y con AL30 en una; "Tasas en pesos" salió de la caución del daily en tres y de un gráfico del cierre en una; "Compras del Banco Central" fue el acumulado del mes en tres y la compra diaria en una. Dos de las cuatro corridas se apartan del criterio mayoritario en dos filas cada una. Es una falla de repetibilidad, el criterio que más pesa después de la especificación, y las reglas de Restricciones de v3 no la tocan. Queda como limitación conocida y como siguiente paso natural sobre la pieza Formato.
+
+  **Salvedades:** dos observaciones por condición y una sola semana. Que v3 funcione en la semana del 14 no prueba que funcione en la del 21; eso lo mide la corrida 3.
+- **Commit:** contrato v3 en `f4c30b8`; evidencia en el commit del hito 6b.
 
 ## 7. Comparación de las tres corridas
 
